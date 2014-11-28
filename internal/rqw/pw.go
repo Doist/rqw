@@ -75,8 +75,7 @@ func (t *Troop) SpawnProcess() error {
 		return nil
 	}
 	cmd := exec.Command(t.path)
-	// TODO: add SysProcAttr, see github.com/artyom/tentacles
-	// cmd.SysProcAttr = sysProcAttr()
+	cmd.SysProcAttr = sysProcAttr()
 	if err := cmd.Start(); err != nil {
 		t.gate.Unlock()
 		return err
