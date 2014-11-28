@@ -127,6 +127,9 @@ func (t *Troop) done() bool {
 func (t *Troop) Loop(checkDelay time.Duration) {
 	defer t.log.Printf("check loop for %q at %q finished", t.name, t.addr)
 	retryDelay := 1 * time.Second
+	if checkDelay < time.Second {
+		checkDelay = time.Second
+	}
 	ticker := time.NewTicker(checkDelay)
 	defer ticker.Stop()
 	var prevCnt int64 // queue length from previous run
