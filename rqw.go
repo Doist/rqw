@@ -8,7 +8,7 @@ import (
 	"syscall"
 	"time"
 
-	"bitbucket.org/artyom_p/rqw/internal/rqw"
+	"github.com/Doist/rqw/internal/rqw"
 
 	"github.com/artyom/autoflags"
 )
