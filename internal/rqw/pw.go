@@ -194,6 +194,9 @@ CONNLOOP:
 				client.Close()
 				continue CONNLOOP
 			}
+			if cnt != prevCnt {
+				t.log.Printf("%d items in queue", cnt)
+			}
 			switch {
 			case cnt < 0:
 				continue
