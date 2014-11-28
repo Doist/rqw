@@ -39,6 +39,7 @@ func NewTroop(addr, name, program string, maxWorkers int, logger *log.Logger) *T
 		name:  name,
 		path:  program,
 		gate:  NewGate(maxWorkers),
+		quit:  make(chan struct{}),
 		procs: make(map[*exec.Cmd]struct{}),
 	}
 }
