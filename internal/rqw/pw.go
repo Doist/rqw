@@ -13,6 +13,8 @@ import (
 	"github.com/fzzy/radix/redis"
 )
 
+const killDelay = time.Second
+
 // Troop is a group of worker processes consuming items from redis queue
 // organized as a sorted set.
 type Troop struct {
@@ -43,18 +45,16 @@ func NewTroop(addr, name, program string, maxWorkers int, logger *log.Logger) *T
 
 // KillProcess kills random running worker process. If no processes are running,
 // this function is no-op.
-func (t *Troop) KillProcess() error {
+func (t *Troop) KillProcess() {
 	t.m.Lock()
 	defer t.m.Unlock()
 	for cmd := range t.procs {
-		if cmd.Process != nil {
-			t.log.Printf("kill process %q", cmd.Path)
-			// XXX: is TERM better here?
-			// return cmd.Process.Signal(syscall.SIGTERM)
-			return cmd.Process.Kill()
-		}
+		t.log.Printf("terminate %q [%d]", cmd.Path, cmd.Process.Pid)
+		cmd.Process.Signal(syscall.SIGTERM)
+		time.Sleep(killDelay)
+		cmd.Process.Kill()
+		return // we need only one process
 	}
-	return nil
 }
 
 // SpawnProcess starts one worker process if there's capacity for it. Out of
@@ -87,13 +87,13 @@ func (t *Troop) SpawnProcess() error {
 	go func() {
 		defer t.gate.Unlock()
 		if err := cmd.Wait(); err != nil {
-			t.log.Printf("process %q: %s", cmd.Path, exitReason(err))
+			t.log.Printf("process %q [%d]: %s", cmd.Path, cmd.Process.Pid, exitReason(err))
 		}
 		t.m.Lock()
 		defer t.m.Unlock()
 		delete(t.procs, cmd)
 	}()
-	t.log.Printf("process %q spawned", cmd.Path)
+	t.log.Printf("process %q [%d] spawned", cmd.Path, cmd.Process.Pid)
 	return nil
 }
 
@@ -107,11 +107,17 @@ func (t *Troop) Shutdown() {
 	}
 	t.m.Lock()
 	defer t.m.Unlock()
+	var wg sync.WaitGroup
 	for cmd := range t.procs {
-		if cmd.Process != nil {
+		wg.Add(1)
+		go func(cmd *exec.Cmd) {
+			defer wg.Done()
+			cmd.Process.Signal(syscall.SIGTERM)
+			time.Sleep(killDelay)
 			cmd.Process.Kill()
-		}
+		}(cmd)
 	}
+	wg.Wait()
 	t.log.Print("Troop shut down")
 }
 
