@@ -158,10 +158,9 @@ func (t *Troop) done() bool {
 }
 
 // Loop connects to redis instance and polls queue length with ZCOUNT command,
-// using 0 as min and current unix timestamp as max values. If queue length
-// increased from previous run or stayed at the same positive count, Loop spawns
-// extra worker by SpawnProcess call.  If queue length drops by more than 5%
-// since previous check, Loop kills one worker.
+// using 0 as min and current unix timestamp as max values. If queue is not
+// empty, Loop spawns extra worker by SpawnProcess call.  If queue length drops
+// by more than 5% since previous check, Loop kills one worker.
 func (t *Troop) Loop(checkDelay time.Duration) {
 	defer t.log.Printf("check loop for %q at %q finished", t.name, t.addr)
 	retryDelay := 1 * time.Second
@@ -203,7 +202,7 @@ CONNLOOP:
 			switch {
 			case cnt < 0:
 				continue
-			case cnt > 0 && cnt >= prevCnt:
+			case cnt > 0:
 				t.SpawnProcess()
 			case cnt < prevCnt && prevCnt-cnt > (prevCnt/100*5):
 				t.KillProcess(true)
