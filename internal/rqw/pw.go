@@ -45,10 +45,14 @@ func NewTroop(addr, name, program string, maxWorkers int, logger *log.Logger) *T
 }
 
 // KillProcess kills random running worker process. If no processes are running,
-// this function is no-op.
-func (t *Troop) KillProcess() {
+// this function is no-op. Takes one bool argument, when true, it would spare
+// process if it is the only one running.
+func (t *Troop) KillProcess(spareLast bool) {
 	t.m.Lock()
 	defer t.m.Unlock()
+	if spareLast && len(t.procs) == 1 {
+		return // do not kill last process
+	}
 	for cmd := range t.procs {
 		t.log.Printf("terminate %q [%d]", cmd.Path, cmd.Process.Pid)
 		cmd.Process.Signal(syscall.SIGTERM)
@@ -181,9 +185,9 @@ CONNLOOP:
 			case cnt > 0 && cnt >= prevCnt:
 				t.SpawnProcess()
 			case cnt < prevCnt && prevCnt-cnt > (prevCnt/100*5):
-				t.KillProcess() // TODO: we can kill the last one worker even if queue still not empty
+				t.KillProcess(true)
 			case cnt == 0:
-				t.KillProcess()
+				t.KillProcess(false)
 			}
 			prevCnt = cnt
 		}
