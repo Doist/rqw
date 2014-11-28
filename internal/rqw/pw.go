@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/davecheney/loadavg"
 	"github.com/fzzy/radix/redis"
 )
 
@@ -82,6 +83,14 @@ func (t *Troop) SpawnProcess() error {
 	}
 	// throttle spawn rate as we close to max capacity
 	if len(t.gate) > rand.Intn(cap(t.gate)) {
+		t.log.Print("spawn throttled due to capacity increase")
+		t.gate.Unlock()
+		return nil
+	}
+	// throttle spawn rate as load average increases
+	if la, err := loadavg.LoadAvg(); err == nil &&
+		float64(la[1]) > rand.NormFloat64()*3+7 {
+		t.log.Printf("spawn throttled due to load average (%.2f)", la[1])
 		t.gate.Unlock()
 		return nil
 	}
