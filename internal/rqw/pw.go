@@ -86,8 +86,12 @@ func (t *Troop) SpawnProcess() error {
 	t.procs[cmd] = struct{}{}
 	go func() {
 		defer t.gate.Unlock()
-		if err := cmd.Wait(); err != nil {
-			t.log.Printf("process %q [%d]: %s", cmd.Path, cmd.Process.Pid, exitReason(err))
+		switch err := cmd.Wait(); {
+		case err == nil:
+			t.log.Printf("process %q [%d] finished", cmd.Path, cmd.Process.Pid)
+		default:
+			t.log.Printf("process %q [%d]: %s", cmd.Path, cmd.Process.Pid,
+				exitReason(err))
 		}
 		t.m.Lock()
 		defer t.m.Unlock()
