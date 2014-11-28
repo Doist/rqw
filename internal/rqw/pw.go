@@ -53,13 +53,19 @@ func (t *Troop) KillProcess(spareLast bool) {
 	if spareLast && len(t.procs) == 1 {
 		return // do not kill last process
 	}
-	for cmd := range t.procs {
-		t.log.Printf("terminate %q [%d]", cmd.Path, cmd.Process.Pid)
-		cmd.Process.Signal(syscall.SIGTERM)
-		time.Sleep(killDelay)
-		cmd.Process.Kill()
-		return // we need only one process
+	var cmd *exec.Cmd
+	for cmd = range t.procs {
+		// range over map iterates in random order, we need one
+		// iteration to grab random element, so break loop here
+		break
 	}
+	if cmd == nil {
+		return
+	}
+	t.log.Printf("terminate %q [%d]", cmd.Path, cmd.Process.Pid)
+	cmd.Process.Signal(syscall.SIGTERM)
+	time.Sleep(killDelay)
+	cmd.Process.Kill()
 }
 
 // SpawnProcess starts one worker process if there's capacity for it. Out of
