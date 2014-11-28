@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"math/rand"
 	"os/exec"
 	"sync"
 	"syscall"
@@ -66,6 +67,11 @@ func (t *Troop) SpawnProcess() error {
 	case t.gate <- struct{}{}:
 	default:
 		// out of capacity
+		return nil
+	}
+	// throttle spawn rate as we close to max capacity
+	if len(t.gate) > rand.Intn(cap(t.gate)) {
+		t.gate.Unlock()
 		return nil
 	}
 	cmd := exec.Command(t.path)
