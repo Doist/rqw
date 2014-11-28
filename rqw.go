@@ -4,6 +4,8 @@ import (
 	"flag"
 	"log"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"bitbucket.org/artyom_p/rqw/internal/rqw"
@@ -12,6 +14,7 @@ import (
 )
 
 func main() {
+	logger := log.New(os.Stdout, "", log.Ltime|log.Lshortfile)
 	config := struct {
 		Addr    string        `flag:"redis,redis instance address"`
 		Name    string        `flag:"queue,queue name"`
@@ -26,7 +29,7 @@ func main() {
 		Delay:   3 * time.Second,
 	}
 	if err := autoflags.Define(&config); err != nil {
-		log.Fatal(err)
+		logger.Fatal(err)
 	}
 	flag.Parse()
 	if config.Addr == "" || config.Name == "" || config.Program == "" || config.Limit < 1 || config.Delay < time.Second {
@@ -38,7 +41,11 @@ func main() {
 		config.Name,
 		config.Program,
 		config.Limit,
-		log.New(os.Stdout, "", log.Ltime|log.Lshortfile),
+		logger,
 	)
-	troop.Loop(config.Delay)
+	sigch := make(chan os.Signal, 1)
+	signal.Notify(sigch, os.Interrupt, syscall.SIGTERM)
+	go troop.Loop(config.Delay)
+	logger.Print(<-sigch)
+	troop.Shutdown()
 }
