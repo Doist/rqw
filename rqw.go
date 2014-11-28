@@ -32,7 +32,8 @@ func main() {
 		logger.Fatal(err)
 	}
 	flag.Parse()
-	if config.Addr == "" || config.Name == "" || config.Program == "" || config.Limit < 1 || config.Delay < time.Second {
+	if config.Addr == "" || config.Name == "" || config.Program == "" ||
+		config.Limit < 1 || config.Delay < time.Second {
 		flag.Usage()
 		os.Exit(1)
 	}
