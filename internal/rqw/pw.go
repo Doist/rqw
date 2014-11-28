@@ -82,8 +82,11 @@ func (t *Troop) SpawnProcess() error {
 		return nil
 	}
 	// throttle spawn rate as we close to max capacity
-	if len(t.gate) > rand.Intn(cap(t.gate)) {
-		t.log.Print("spawn throttled due to capacity increase")
+	gLen := len(t.gate) - 1 // subtract one as we're already acquired lock above
+	gCap := cap(t.gate)
+	if gLen > rand.Intn(gCap) {
+		t.log.Printf("spawn throttled due to capacity increase (%d out of %d)",
+			gLen, gCap)
 		t.gate.Unlock()
 		return nil
 	}
