@@ -24,11 +24,11 @@ func main() {
 
 		Debug bool `flag:"d,prefix output with source code addresses"`
 	}{
-		Addr:    "192.168.56.101:6379",
-		Name:    "queue",
-		Program: "/tmp/worker.sh",
-		Limit:   3,
-		Delay:   3 * time.Second,
+		Addr:    "localhost:6379",
+		Name:    "",
+		Program: "",
+		Limit:   10,
+		Delay:   15 * time.Second,
 	}
 	if err := autoflags.Define(&config); err != nil {
 		logger.Fatal(err)
