@@ -14,13 +14,15 @@ import (
 )
 
 func main() {
-	logger := log.New(os.Stdout, "", log.Ltime|log.Lshortfile)
+	logger := log.New(os.Stdout, "", log.LstdFlags)
 	config := struct {
 		Addr    string        `flag:"redis,redis instance address"`
 		Name    string        `flag:"queue,queue name"`
 		Program string        `flag:"worker,path to worker program"`
 		Limit   int           `flag:"max,max number of workers"`
 		Delay   time.Duration `flag:"delay,delay between checks (min. 1s)"`
+
+		Debug bool `flag:"d,prefix output with source code addresses"`
 	}{
 		Addr:    "192.168.56.101:6379",
 		Name:    "queue",
@@ -36,6 +38,9 @@ func main() {
 		config.Limit < 1 || config.Delay < time.Second {
 		flag.Usage()
 		os.Exit(1)
+	}
+	if config.Debug {
+		logger.SetFlags(logger.Flags() | log.Lshortfile)
 	}
 	troop := rqw.NewTroop(
 		config.Addr,
