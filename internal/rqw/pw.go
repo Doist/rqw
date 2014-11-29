@@ -260,3 +260,5 @@ func NewGate(size int) Gate {
 	}
 	return make(chan struct{}, size)
 }
+
+func init() { rand.Seed(time.Now().UnixNano()) }
