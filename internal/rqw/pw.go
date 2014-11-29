@@ -1,4 +1,4 @@
-package rqw
+package rqw // import "github.com/Doist/rqw/internal/rqw"
 
 import (
 	"errors"
