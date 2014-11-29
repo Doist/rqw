@@ -110,10 +110,11 @@ func (t *Troop) SpawnProcess() error {
 		defer t.gate.Unlock()
 		switch err := cmd.Wait(); {
 		case err == nil:
-			t.log.Printf("process %q [%d] finished", cmd.Path, cmd.Process.Pid)
+			t.log.Printf("process %q [%d] finished (%s)", cmd.Path, cmd.Process.Pid,
+				processStats(cmd.ProcessState))
 		default:
-			t.log.Printf("process %q [%d]: %s", cmd.Path, cmd.Process.Pid,
-				exitReason(err))
+			t.log.Printf("process %q [%d]: %s (%s)", cmd.Path, cmd.Process.Pid,
+				exitReason(err), processStats(cmd.ProcessState))
 		}
 		t.m.Lock()
 		defer t.m.Unlock()
