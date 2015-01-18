@@ -240,7 +240,7 @@ func (t *Troop) updateMemAvg(rss int64) {
 	if rss <= 0 {
 		return
 	}
-	avg := float64(t.avgMem) * (float64(t.avgMem) / float64(t.samples+1))
+	avg := float64(t.avgMem) * (float64(t.samples) / float64(t.samples+1))
 	avg += float64(rss) / float64(t.samples+1)
 	t.avgMem = int64(avg)
 	t.samples++
