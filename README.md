@@ -10,6 +10,7 @@ read with `ZCOUNT queue_key 0 current_unix_timestamp` command.
 	  -max=10: max number of workers
 	  -queue="": queue name
 	  -redis="localhost:6379": redis instance address
+	  -threshold=0: min queue size to spawn workers
 	  -worker="": path to worker program
 
 Example:

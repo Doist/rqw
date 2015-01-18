@@ -25,6 +25,7 @@ type Troop struct {
 	addr string // address of redis instance
 	name string // key of sorted set queue
 	path string // path to program to run
+	thr  int    // queue size threshold to spawn workers
 
 	quit  chan struct{}          // used to signal loop to quit
 	gate  Gate                   // used to limit max.number of processes
@@ -33,12 +34,13 @@ type Troop struct {
 
 // NewTroop returns new initialized Troop. No error checking is done here, so
 // each argument should be non-nil/non-zero, otherwise it would panic elsewhere.
-func NewTroop(addr, name, program string, maxWorkers int, logger *log.Logger) *Troop {
+func NewTroop(addr, name, program string, thr, maxWorkers int, logger *log.Logger) *Troop {
 	return &Troop{
 		log:   logger,
 		addr:  addr,
 		name:  name,
 		path:  program,
+		thr:   thr,
 		gate:  NewGate(maxWorkers),
 		quit:  make(chan struct{}),
 		procs: make(map[*exec.Cmd]struct{}),
@@ -159,9 +161,9 @@ func (t *Troop) done() bool {
 }
 
 // Loop connects to redis instance and polls queue length with ZCOUNT command,
-// using 0 as min and current unix timestamp as max values. If queue is not
-// empty, Loop spawns extra worker by SpawnProcess call.  If queue length drops
-// by more than 5% since previous check, Loop kills one worker.
+// using 0 as min and current unix timestamp as max values. If queue is has more
+// than t.thr elements, Loop spawns extra worker by SpawnProcess call. If queue
+// length drops by more than 5% since previous check, Loop kills one worker.
 func (t *Troop) Loop(checkDelay time.Duration) {
 	defer t.log.Printf("check loop for %q at %q finished", t.name, t.addr)
 	retryDelay := 1 * time.Second
@@ -201,13 +203,11 @@ CONNLOOP:
 				t.log.Printf("%d items in queue", cnt)
 			}
 			switch {
-			case cnt < 0:
-				continue
-			case cnt > 0:
+			case cnt > int64(t.thr):
 				t.SpawnProcess()
 			case cnt < prevCnt && prevCnt-cnt > (prevCnt/100*5):
 				t.KillProcess(true)
-			case cnt == 0:
+			case cnt <= int64(t.thr):
 				t.KillProcess(false)
 			}
 			prevCnt = cnt

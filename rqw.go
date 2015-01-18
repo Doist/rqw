@@ -19,6 +19,7 @@ func main() {
 		Addr    string        `flag:"redis,redis instance address"`
 		Name    string        `flag:"queue,queue name"`
 		Program string        `flag:"worker,path to worker program"`
+		Thresh  int           `flag:"threshold,min queue size to spawn workers"`
 		Limit   int           `flag:"max,max number of workers"`
 		Delay   time.Duration `flag:"delay,delay between checks (min. 1s)"`
 
@@ -35,6 +36,7 @@ func main() {
 	}
 	flag.Parse()
 	if config.Addr == "" || config.Name == "" || config.Program == "" ||
+		config.Thresh < 0 ||
 		config.Limit < 1 || config.Delay < time.Second {
 		flag.Usage()
 		os.Exit(1)
@@ -46,6 +48,7 @@ func main() {
 		config.Addr,
 		config.Name,
 		config.Program,
+		config.Thresh,
 		config.Limit,
 		logger,
 	)
