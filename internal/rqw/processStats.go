@@ -22,6 +22,18 @@ func processStats(st *os.ProcessState) string {
 	return fmt.Sprintf("sys: %s, user: %s", st.SystemTime(), st.UserTime())
 }
 
+// maxRSS returns max RSS usage from Rusage struct; if none can be extracted,
+// 0 is returned.
+func maxRSS(st *os.ProcessState) int64 {
+	if st == nil {
+		return 0
+	}
+	if r, ok := st.SysUsage().(*syscall.Rusage); ok && r != nil {
+		return r.Maxrss << 10
+	}
+	return 0
+}
+
 // ByteSize implements Stringer interface for printing size in human-readable
 // form
 type ByteSize float64

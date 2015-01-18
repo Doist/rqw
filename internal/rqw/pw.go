@@ -30,6 +30,9 @@ type Troop struct {
 	quit  chan struct{}          // used to signal loop to quit
 	gate  Gate                   // used to limit max.number of processes
 	procs map[*exec.Cmd]struct{} // used to access Cmd if need to kill one
+
+	avgMem  int64 // running average of workers' RSS
+	samples int64 // number of samples of memory put into running average
 }
 
 // NewTroop returns new initialized Troop. No error checking is done here, so
@@ -99,6 +102,12 @@ func (t *Troop) SpawnProcess() error {
 		t.gate.Unlock()
 		return nil
 	}
+	if m := t.rssAverage(); !memAvail(m) {
+		t.log.Printf("spawn throttled due to low memory conditions, "+
+			"avg. worker RSS is %s", ByteSize(m))
+		t.gate.Unlock()
+		return nil
+	}
 	cmd := exec.Command(t.path)
 	cmd.SysProcAttr = sysProcAttr()
 	if err := cmd.Start(); err != nil {
@@ -119,8 +128,9 @@ func (t *Troop) SpawnProcess() error {
 				exitReason(err), processStats(cmd.ProcessState))
 		}
 		t.m.Lock()
-		defer t.m.Unlock()
+		t.updateMemAvg(maxRSS(cmd.ProcessState))
 		delete(t.procs, cmd)
+		t.m.Unlock()
 	}()
 	t.log.Printf("process %q [%d] spawned", cmd.Path, cmd.Process.Pid)
 	return nil
@@ -213,6 +223,27 @@ CONNLOOP:
 			prevCnt = cnt
 		}
 	}
+}
+
+// rssAverage returns running average of workers' RSS
+func (t *Troop) rssAverage() int64 {
+	t.m.RLock()
+	n := t.avgMem
+	t.m.RUnlock()
+	return n
+}
+
+// updateMemAvg updates running average of workers' RSS. It is assumed that this
+// function is called with t.m lock already held — no locking is done inside
+// function.
+func (t *Troop) updateMemAvg(rss int64) {
+	if rss <= 0 {
+		return
+	}
+	avg := float64(t.avgMem) * (float64(t.avgMem) / float64(t.samples+1))
+	avg += float64(rss) / float64(t.samples+1)
+	t.avgMem = int64(avg)
+	t.samples++
 }
 
 // exitReason translates error returned by os.Process.Wait() into human-readable
