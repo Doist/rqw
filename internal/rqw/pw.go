@@ -217,7 +217,7 @@ CONNLOOP:
 				t.SpawnProcess()
 			case cnt < prevCnt && prevCnt-cnt > (prevCnt/100*5):
 				t.KillProcess(true)
-			case cnt <= int64(t.thr):
+			case cnt <= int64(t.thr*2/3):
 				t.KillProcess(false)
 			}
 			prevCnt = cnt
