@@ -190,7 +190,7 @@ CONNLOOP:
 		}
 		client, err := redis.DialTimeout("tcp", t.addr, 10*time.Second)
 		if err != nil {
-			t.log.Printf("failed to connect to redis at %q: ", t.addr, err)
+			t.log.Printf("failed to connect to redis at %q: %v", t.addr, err)
 			time.Sleep(retryDelay)
 			continue CONNLOOP
 		}
