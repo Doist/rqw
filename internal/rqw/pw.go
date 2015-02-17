@@ -95,6 +95,11 @@ func (t *Troop) SpawnProcess() error {
 		t.gate.Unlock()
 		return nil
 	}
+	if st := stealRatio(); rand.Float64() < st {
+		t.log.Printf("spawn throttled due to high CPU steal ratio (%.2f)", st)
+		t.gate.Unlock()
+		return nil
+	}
 	// throttle spawn rate as load average increases
 	if la, err := loadavg.LoadAvg(); err == nil &&
 		float64(la[1]) > rand.NormFloat64()*3+7 {
