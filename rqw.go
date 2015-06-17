@@ -31,9 +31,7 @@ func main() {
 		Limit:   10,
 		Delay:   15 * time.Second,
 	}
-	if err := autoflags.Define(&config); err != nil {
-		logger.Fatal(err)
-	}
+	autoflags.Define(&config)
 	flag.Parse()
 	if config.Addr == "" || config.Name == "" || config.Program == "" ||
 		config.Thresh < 0 ||
