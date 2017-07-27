@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/davecheney/loadavg"
-	"github.com/fzzy/radix/redis"
+	"github.com/mediocregopher/radix.v2/redis"
 )
 
 const killDelay = time.Second
