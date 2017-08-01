@@ -1,6 +1,7 @@
 package rqw // import "github.com/Doist/rqw/internal/rqw"
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log"
@@ -27,9 +28,10 @@ type Troop struct {
 	path string // path to program to run
 	thr  int    // queue size threshold to spawn workers
 
-	quit  chan struct{}          // used to signal loop to quit
-	gate  Gate                   // used to limit max.number of processes
-	procs map[*exec.Cmd]struct{} // used to access Cmd if need to kill one
+	ctx    context.Context
+	cancel context.CancelFunc
+	gate   Gate                   // used to limit max.number of processes
+	procs  map[*exec.Cmd]struct{} // used to access Cmd if need to kill one
 
 	avgMem  int64 // running average of workers' RSS
 	samples int64 // number of samples of memory put into running average
@@ -38,15 +40,17 @@ type Troop struct {
 // NewTroop returns new initialized Troop. No error checking is done here, so
 // each argument should be non-nil/non-zero, otherwise it would panic elsewhere.
 func NewTroop(addr, name, program string, thr, maxWorkers int, logger *log.Logger) *Troop {
+	ctx, cancel := context.WithCancel(context.Background())
 	return &Troop{
-		log:   logger,
-		addr:  addr,
-		name:  name,
-		path:  program,
-		thr:   thr,
-		gate:  NewGate(maxWorkers),
-		quit:  make(chan struct{}),
-		procs: make(map[*exec.Cmd]struct{}),
+		log:    logger,
+		addr:   addr,
+		name:   name,
+		path:   program,
+		thr:    thr,
+		ctx:    ctx,
+		cancel: cancel,
+		gate:   NewGate(maxWorkers),
+		procs:  make(map[*exec.Cmd]struct{}),
 	}
 }
 
@@ -79,7 +83,7 @@ func (t *Troop) KillProcess(spareLast bool) {
 // ErrTroopDone error returned.
 func (t *Troop) SpawnProcess() error {
 	select {
-	case <-t.quit:
+	case <-t.ctx.Done():
 		return ErrTroopDone
 	case t.gate <- struct{}{}:
 	default:
@@ -144,11 +148,7 @@ func (t *Troop) SpawnProcess() error {
 // Shutdown marks Troop as done and kills all worker processes. Loop shuts
 // itself down after Shutdown was called.
 func (t *Troop) Shutdown() {
-	select {
-	case <-t.quit: // already closed
-	default:
-		close(t.quit)
-	}
+	t.cancel()
 	t.m.Lock()
 	defer t.m.Unlock()
 	var wg sync.WaitGroup
@@ -168,7 +168,7 @@ func (t *Troop) Shutdown() {
 // done is a convenient method to check whether Troop was already shut down
 func (t *Troop) done() bool {
 	select {
-	case <-t.quit:
+	case <-t.ctx.Done():
 		return true
 	default:
 		return false
@@ -202,7 +202,7 @@ CONNLOOP:
 		prevCnt = -1 // so we won't mix it with empty queue
 		for {
 			select {
-			case <-t.quit:
+			case <-t.ctx.Done():
 				client.Close()
 				return
 			case <-ticker.C:
