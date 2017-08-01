@@ -35,6 +35,30 @@ type Troop struct {
 
 	avgMem  int64 // running average of workers' RSS
 	samples int64 // number of samples of memory put into running average
+
+	// keep spare worker for this long after queue has been seen non-empty
+	gracePeriod      time.Duration
+	lastSeenNonEmpty time.Time // last time when queue has been seen non-empty
+}
+
+// WithGracePeriod configures troop to use given grace period when calculating
+// whether to reap the last worker. If grace period is non-zero, troop will
+// spare last worker if queue has been seen non-empty during the past d.
+// WithGracePeriod is expected to be run during Troop configuration.
+func WithGracePeriod(t *Troop, d time.Duration) *Troop {
+	if d < 0 {
+		panic("WithGracePeriod called with negative d")
+	}
+	t.gracePeriod = d
+	return t
+}
+
+// touch updates lastSeenNonEmpty attribute to current time
+func (t *Troop) touch() {
+	now := time.Now()
+	t.m.Lock()
+	defer t.m.Unlock()
+	t.lastSeenNonEmpty = now
 }
 
 // NewTroop returns new initialized Troop. No error checking is done here, so
@@ -62,6 +86,9 @@ func (t *Troop) KillProcess(spareLast bool) {
 	defer t.m.Unlock()
 	if spareLast && len(t.procs) == 1 {
 		return // do not kill last process
+	}
+	if len(t.procs) == 1 && time.Now().Sub(t.lastSeenNonEmpty) < t.gracePeriod {
+		return
 	}
 	var cmd *exec.Cmd
 	for cmd = range t.procs {
@@ -216,6 +243,9 @@ CONNLOOP:
 			}
 			if cnt != prevCnt {
 				t.log.Printf("%d items in queue", cnt)
+			}
+			if cnt > 0 {
+				t.touch()
 			}
 			switch {
 			case cnt > int64(t.thr):

@@ -22,6 +22,7 @@ func main() {
 		Thresh  int           `flag:"threshold,min queue size to spawn workers"`
 		Limit   int           `flag:"max,max number of workers"`
 		Delay   time.Duration `flag:"delay,delay between checks (min. 1s)"`
+		Grace   time.Duration `flag:"grace,grace period to keep last worker alive"`
 
 		Debug bool `flag:"d,prefix output with source code addresses"`
 	}{
@@ -30,6 +31,7 @@ func main() {
 		Program: "",
 		Limit:   10,
 		Delay:   15 * time.Second,
+		Grace:   10 * time.Minute,
 	}
 	autoflags.Define(&config)
 	flag.Parse()
@@ -50,6 +52,9 @@ func main() {
 		config.Limit,
 		logger,
 	)
+	if config.Grace > 0 {
+		troop = rqw.WithGracePeriod(troop, config.Grace)
+	}
 	sigch := make(chan os.Signal, 1)
 	signal.Notify(sigch, os.Interrupt, syscall.SIGTERM)
 	go troop.Loop(config.Delay)
