@@ -81,7 +81,7 @@ func NewTroop(addr, name, program string, thr, maxWorkers int, logger *log.Logge
 	}
 }
 
-// KillProcess kills random running worker process. If no processes are running,
+// KillProcess kills arbitrary running worker process. If no processes are running,
 // this function is no-op. Takes one bool argument, when true, it would spare
 // process if it is the only one running.
 func (t *Troop) KillProcess(spareLast bool) {
@@ -95,8 +95,8 @@ func (t *Troop) KillProcess(spareLast bool) {
 	}
 	var cmd *exec.Cmd
 	for cmd = range t.procs {
-		// range over map iterates in random order, we need one
-		// iteration to grab random element, so break loop here
+		// range over map iterates in arbitrary order, we need one
+		// iteration to grab single element, so break loop here
 		break
 	}
 	if cmd == nil {
