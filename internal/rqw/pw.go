@@ -115,7 +115,7 @@ func (t *Troop) LogStderr() {
 	if val == nil {
 		return
 	}
-	t.log.Printf("most recently failed command stderr:\n%s\nend of stderr", val.([]byte))
+	t.log.Printf("most recently failed command stderr:\n%s", val.([]byte))
 }
 
 // SpawnProcess starts one worker process if there's capacity for it. Out of
