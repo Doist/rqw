@@ -8,6 +8,7 @@ import (
 	"math/rand"
 	"os/exec"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -20,6 +21,8 @@ const killDelay = time.Second
 // Troop is a group of worker processes consuming items from redis queue
 // organized as a sorted set.
 type Troop struct {
+	stderr atomic.Value // holds []byte of stderr of the last unsuccessful command
+
 	m   sync.RWMutex
 	log *log.Logger
 
@@ -105,6 +108,16 @@ func (t *Troop) KillProcess(spareLast bool) {
 	cmd.Process.Kill()
 }
 
+// LogStderr outputs to log prefix+suffix of the stderr from the most recently
+// command that returned with non-nil error.
+func (t *Troop) LogStderr() {
+	val := t.stderr.Load()
+	if val == nil {
+		return
+	}
+	t.log.Printf("most recently failed command stderr:\n%s\nend of stderr", val.([]byte))
+}
+
 // SpawnProcess starts one worker process if there's capacity for it. Out of
 // capacity condition is not an error. If Troop is already shut down,
 // ErrTroopDone error returned.
@@ -145,6 +158,7 @@ func (t *Troop) SpawnProcess() error {
 		return nil
 	}
 	cmd := exec.Command(t.path)
+	cmd.Stderr = &prefixSuffixSaver{N: 32 << 10}
 	cmd.SysProcAttr = sysProcAttr()
 	if err := cmd.Start(); err != nil {
 		t.gate.Unlock()
@@ -162,6 +176,9 @@ func (t *Troop) SpawnProcess() error {
 		default:
 			t.log.Printf("process %q [%d]: %s (%s)", cmd.Path, cmd.Process.Pid,
 				exitReason(err), processStats(cmd.ProcessState))
+			if s, ok := cmd.Stderr.(*prefixSuffixSaver); ok && s.prefix != nil {
+				t.stderr.Store(s.Bytes())
+			}
 		}
 		t.m.Lock()
 		t.updateMemAvg(maxRSS(cmd.ProcessState))

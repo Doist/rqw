@@ -55,6 +55,13 @@ func main() {
 	if config.Grace > 0 {
 		troop = rqw.WithGracePeriod(troop, config.Grace)
 	}
+	go func() {
+		sigch := make(chan os.Signal, 1)
+		signal.Notify(sigch, syscall.SIGUSR1)
+		for range sigch {
+			troop.LogStderr()
+		}
+	}()
 	sigch := make(chan os.Signal, 1)
 	signal.Notify(sigch, os.Interrupt, syscall.SIGTERM)
 	go troop.Loop(config.Delay)
