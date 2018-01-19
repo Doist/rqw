@@ -17,6 +17,8 @@ import (
 )
 
 const killDelay = time.Second
+const laStdDev = 2
+const laMean = 10
 
 // Troop is a group of worker processes consuming items from redis queue
 // organized as a sorted set.
@@ -133,7 +135,7 @@ func (t *Troop) SpawnProcess() error {
 	// throttle spawn rate as we close to max capacity
 	gLen := len(t.gate) - 1 // subtract one as we're already acquired lock above
 	gCap := cap(t.gate)
-	if gLen > rand.Intn(gCap) {
+	if gLen > gCap*2/3 && gLen > rand.Intn(gCap) {
 		t.log.Printf("spawn throttled due to capacity increase (%d out of %d)",
 			gLen, gCap)
 		t.gate.Unlock()
@@ -146,7 +148,7 @@ func (t *Troop) SpawnProcess() error {
 	}
 	// throttle spawn rate as load average increases
 	if la, err := loadavg.LoadAvg(); err == nil &&
-		float64(la[1]) > rand.NormFloat64()*3+7 {
+		float64(la[1]) > rand.NormFloat64()*laStdDev+laMean {
 		t.log.Printf("spawn throttled due to load average (%.2f)", la[1])
 		t.gate.Unlock()
 		return nil
