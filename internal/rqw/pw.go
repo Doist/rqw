@@ -135,6 +135,9 @@ func (t *Troop) SpawnProcess() error {
 	// throttle spawn rate as we close to max capacity
 	gLen := len(t.gate) - 1 // subtract one as we're already acquired lock above
 	gCap := cap(t.gate)
+	if gLen == 0 { // don't ever throttle first worker
+		goto doStart
+	}
 	if gLen > gCap*2/3 && gLen > rand.Intn(gCap) {
 		t.log.Printf("spawn throttled due to capacity increase (%d out of %d)",
 			gLen, gCap)
@@ -159,6 +162,7 @@ func (t *Troop) SpawnProcess() error {
 		t.gate.Unlock()
 		return nil
 	}
+doStart:
 	cmd := exec.Command(t.path)
 	cmd.Stderr = &prefixSuffixSaver{N: 32 << 10}
 	cmd.SysProcAttr = sysProcAttr()
