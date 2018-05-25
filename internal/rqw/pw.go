@@ -16,7 +16,6 @@ import (
 	"github.com/mediocregopher/radix.v2/redis"
 )
 
-const killDelay = time.Second
 const laStdDev = 2
 const laMean = 10
 
@@ -43,7 +42,8 @@ type Troop struct {
 
 	// keep spare worker for this long after queue has been seen non-empty
 	gracePeriod      time.Duration
-	lastSeenNonEmpty time.Time // last time when queue has been seen non-empty
+	lastSeenNonEmpty time.Time     // last time when queue has been seen non-empty
+	killDelay        time.Duration // delay between TERM and KILL
 }
 
 // WithGracePeriod configures troop to use given grace period when calculating
@@ -55,6 +55,13 @@ func WithGracePeriod(t *Troop, d time.Duration) *Troop {
 		panic("WithGracePeriod called with negative d")
 	}
 	t.gracePeriod = d
+	return t
+}
+
+// WithKillDelay configures troop to wait for given duration between sending
+// TERM and KILL when terminating workers.
+func WithKillDelay(t *Troop, d time.Duration) *Troop {
+	t.killDelay = d
 	return t
 }
 
@@ -71,15 +78,16 @@ func (t *Troop) touch() {
 func NewTroop(addr, name, program string, thr, maxWorkers int, logger *log.Logger) *Troop {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &Troop{
-		log:    logger,
-		addr:   addr,
-		name:   name,
-		path:   program,
-		thr:    thr,
-		ctx:    ctx,
-		cancel: cancel,
-		gate:   NewGate(maxWorkers),
-		procs:  make(map[*exec.Cmd]struct{}),
+		log:       logger,
+		addr:      addr,
+		name:      name,
+		path:      program,
+		thr:       thr,
+		ctx:       ctx,
+		cancel:    cancel,
+		gate:      NewGate(maxWorkers),
+		procs:     make(map[*exec.Cmd]struct{}),
+		killDelay: time.Second,
 	}
 }
 
@@ -106,7 +114,7 @@ func (t *Troop) KillProcess(spareLast bool) {
 	}
 	t.log.Printf("terminate %q [%d]", cmd.Path, cmd.Process.Pid)
 	cmd.Process.Signal(syscall.SIGTERM)
-	time.Sleep(killDelay)
+	time.Sleep(t.killDelay)
 	cmd.Process.Kill()
 }
 
@@ -207,7 +215,7 @@ func (t *Troop) Shutdown() {
 		go func(cmd *exec.Cmd) {
 			defer wg.Done()
 			cmd.Process.Signal(syscall.SIGTERM)
-			time.Sleep(killDelay)
+			time.Sleep(t.killDelay)
 			cmd.Process.Kill()
 		}(cmd)
 	}

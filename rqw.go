@@ -16,22 +16,24 @@ import (
 func main() {
 	logger := log.New(os.Stdout, "", log.LstdFlags)
 	config := struct {
-		Addr    string        `flag:"redis,redis instance address"`
-		Name    string        `flag:"queue,queue name"`
-		Program string        `flag:"worker,path to worker program"`
-		Thresh  int           `flag:"threshold,min queue size to spawn workers"`
-		Limit   int           `flag:"max,max number of workers"`
-		Delay   time.Duration `flag:"delay,delay between checks (min. 1s)"`
-		Grace   time.Duration `flag:"grace,grace period to keep last worker alive"`
+		Addr     string        `flag:"redis,redis instance address"`
+		Name     string        `flag:"queue,queue name"`
+		Program  string        `flag:"worker,path to worker program"`
+		Thresh   int           `flag:"threshold,min queue size to spawn workers"`
+		Limit    int           `flag:"max,max number of workers"`
+		Delay    time.Duration `flag:"delay,delay between checks (min. 1s)"`
+		Grace    time.Duration `flag:"grace,grace period to keep last worker alive"`
+		KillWait time.Duration `flag:"wait,how much to wait for a worker to gracefully exit before killing it"`
 
 		Debug bool `flag:"d,prefix output with source code addresses"`
 	}{
-		Addr:    "localhost:6379",
-		Name:    "",
-		Program: "",
-		Limit:   10,
-		Delay:   15 * time.Second,
-		Grace:   10 * time.Minute,
+		Addr:     "localhost:6379",
+		Name:     "",
+		Program:  "",
+		Limit:    10,
+		Delay:    15 * time.Second,
+		Grace:    10 * time.Minute,
+		KillWait: time.Second,
 	}
 	autoflags.Define(&config)
 	flag.Parse()
@@ -55,6 +57,7 @@ func main() {
 	if config.Grace > 0 {
 		troop = rqw.WithGracePeriod(troop, config.Grace)
 	}
+	troop = rqw.WithKillDelay(troop, config.KillWait)
 	go func() {
 		sigch := make(chan os.Signal, 1)
 		signal.Notify(sigch, syscall.SIGUSR1)
