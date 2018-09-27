@@ -17,7 +17,7 @@ import (
 )
 
 const laStdDev = 2
-const laMean = 10
+const laMean = 20
 
 // Troop is a group of worker processes consuming items from redis queue
 // organized as a sorted set.
