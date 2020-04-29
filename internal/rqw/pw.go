@@ -40,10 +40,18 @@ type Troop struct {
 	avgMem  int64 // running average of workers' RSS
 	samples int64 // number of samples of memory put into running average
 
+	termSignal syscall.Signal // terminate signal (TERM by default)
+
 	// keep spare worker for this long after queue has been seen non-empty
 	gracePeriod      time.Duration
 	lastSeenNonEmpty time.Time     // last time when queue has been seen non-empty
-	killDelay        time.Duration // delay between TERM and KILL
+	killDelay        time.Duration // delay between terminate and kill signals
+}
+
+// WithTermSignal configures troop to send that signal to terminate workers.
+func WithTermSignal(t *Troop, termSignal syscall.Signal) *Troop {
+	t.termSignal = termSignal
+	return t
 }
 
 // WithGracePeriod configures troop to use given grace period when calculating
@@ -59,7 +67,7 @@ func WithGracePeriod(t *Troop, d time.Duration) *Troop {
 }
 
 // WithKillDelay configures troop to wait for given duration between sending
-// TERM and KILL when terminating workers.
+// terminate and kill when terminating workers.
 func WithKillDelay(t *Troop, d time.Duration) *Troop {
 	t.killDelay = d
 	return t
@@ -78,16 +86,17 @@ func (t *Troop) touch() {
 func NewTroop(addr, name, program string, thr, maxWorkers int, logger *log.Logger) *Troop {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &Troop{
-		log:       logger,
-		addr:      addr,
-		name:      name,
-		path:      program,
-		thr:       thr,
-		ctx:       ctx,
-		cancel:    cancel,
-		gate:      NewGate(maxWorkers),
-		procs:     make(map[*exec.Cmd]struct{}),
-		killDelay: time.Second,
+		log:        logger,
+		addr:       addr,
+		name:       name,
+		path:       program,
+		thr:        thr,
+		ctx:        ctx,
+		cancel:     cancel,
+		gate:       NewGate(maxWorkers),
+		procs:      make(map[*exec.Cmd]struct{}),
+		termSignal: syscall.SIGTERM,
+		killDelay:  time.Second,
 	}
 }
 
@@ -113,7 +122,7 @@ func (t *Troop) KillProcess(spareLast bool) {
 		return
 	}
 	t.log.Printf("terminate %q [%d]", cmd.Path, cmd.Process.Pid)
-	cmd.Process.Signal(syscall.SIGTERM)
+	cmd.Process.Signal(t.termSignal)
 	time.Sleep(t.killDelay)
 	cmd.Process.Kill()
 }
