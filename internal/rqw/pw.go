@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"math/rand"
+	"os"
 	"os/exec"
 	"sync"
 	"sync/atomic"
@@ -26,6 +27,8 @@ type Troop struct {
 
 	m   sync.RWMutex
 	log *log.Logger
+
+	noisy bool // whether to dump child stdout/stderr as is
 
 	addr string // address of redis instance
 	name string // key of sorted set queue
@@ -62,6 +65,13 @@ func WithGracePeriod(t *Troop, d time.Duration) *Troop {
 // TERM and KILL when terminating workers.
 func WithKillDelay(t *Troop, d time.Duration) *Troop {
 	t.killDelay = d
+	return t
+}
+
+// WithFullOutput disables child processes' stdout/stderr suppression,
+// connecting them directly to os.Stdout/os.Stderr.
+func WithFullOutput(t *Troop) *Troop {
+	t.noisy = true
 	return t
 }
 
@@ -172,7 +182,12 @@ func (t *Troop) SpawnProcess() error {
 	}
 doStart:
 	cmd := exec.Command(t.path)
-	cmd.Stderr = &prefixSuffixSaver{N: 32 << 10}
+	if t.noisy {
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+	} else {
+		cmd.Stderr = &prefixSuffixSaver{N: 32 << 10}
+	}
 	cmd.SysProcAttr = sysProcAttr()
 	if err := cmd.Start(); err != nil {
 		t.gate.Unlock()

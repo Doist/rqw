@@ -24,6 +24,7 @@ func main() {
 		Delay    time.Duration `flag:"delay,delay between checks (min. 1s)"`
 		Grace    time.Duration `flag:"grace,grace period to keep last worker alive"`
 		KillWait time.Duration `flag:"wait,how much to wait for a worker to gracefully exit before killing it"`
+		Noisy    bool          `flag:"noisy,don't suppress workers' stdout/stderr"`
 
 		Debug bool `flag:"d,prefix output with source code addresses"`
 	}{
@@ -54,6 +55,9 @@ func main() {
 		config.Limit,
 		logger,
 	)
+	if config.Noisy {
+		troop = rqw.WithFullOutput(troop)
+	}
 	if config.Grace > 0 {
 		troop = rqw.WithGracePeriod(troop, config.Grace)
 	}
